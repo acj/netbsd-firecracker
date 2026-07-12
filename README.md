@@ -69,7 +69,10 @@ Assembled from the official `base.tar.xz` + `etc.tar.xz` binary sets into an FFS
 
 - `rc.conf` — enables `sshd`, `resize_root=YES` (grows the filesystem to match the
   host-side `truncate` of the image; requires the root fs to be mounted *without*
-  WAPBL logging, hence plain `rw` in fstab), and the `fcnet` script.
+  WAPBL logging, hence plain `rw` in fstab), and the `fcnet` script. After growing
+  the filesystem the guest reboots (the kernel can't adopt the grown superblock
+  in place), which Firecracker reports as a shutdown — launchers must start the
+  VM again after a first-boot resize, as `run-local.sh` does.
 - `fcnet` — rc.d script that derives the guest IP from the MAC address
   (`06:00:AC:10:00:02` → `172.16.0.2`, gateway `172.16.0.1`), mirroring
   freebsd-firecracker's `fcnet-setup.sh`.

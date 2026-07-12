@@ -65,12 +65,31 @@ cat > "$WORKDIR/vmconfig.json" <<EOF
 EOF
 
 rm -f /tmp/netbsd-fc-test.socket
-"$FIRECRACKER" --no-api --config-file "$WORKDIR/vmconfig.json" &
-fc_pid=$!
+start_firecracker() {
+    "$FIRECRACKER" --no-api --config-file "$WORKDIR/vmconfig.json" &
+    fc_pid=$!
+}
+start_firecracker
 trap 'kill $fc_pid 2>/dev/null || true' EXIT
 
+# When resize_root grows the filesystem on first boot it reboots the guest
+# (see files/rc.conf), which Firecracker treats as a shutdown. Allow one
+# relaunch; any further exit is a real failure.
+relaunches=1
+
 echo "Waiting for sshd at $GUEST_IP ..."
-for i in $(seq 1 30); do
+for i in $(seq 1 60); do
+    if ! kill -0 "$fc_pid" 2>/dev/null; then
+        wait "$fc_pid" 2>/dev/null || true
+        if [ "$relaunches" -gt 0 ]; then
+            relaunches=$((relaunches - 1))
+            echo "Firecracker exited (first-boot resize reboot); relaunching ..."
+            start_firecracker
+        else
+            echo "❌ Firecracker exited unexpectedly" >&2
+            exit 1
+        fi
+    fi
     if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
            -o ConnectTimeout=1 -i "$OUTDIR/netbsd.id_rsa" \
            "root@$GUEST_IP" 'uname -a && df -h / && /sbin/sysctl -n hw.ncpu && which rsync'; then
