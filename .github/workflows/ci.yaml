@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - v*
+  workflow_dispatch:
+    inputs:
+      netbsd-release:
+        description: NetBSD release to build from
+        required: false
+        default: 11.0_RC5
+
+permissions:
+  contents: write
+
+env:
+  NETBSD_RELEASE: ${{ inputs.netbsd-release || '11.0_RC5' }}
+
+jobs:
+  build:
+    name: Build kernel and rootfs
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+
+      - name: Build kernel (and cross toolchain)
+        run: ./build-kernel.sh
+
+      - name: Generate SSH keypair
+        run: ./generate-ssh-key.sh
+
+      - name: Build rootfs
+        run: sudo -E ./build-rootfs.sh
+
+      - name: Fetch Firecracker
+        run: ./fetch-firecracker.sh
+
+      - name: Smoke test
+        run: sudo ./run-local.sh
+
+      - name: Archive build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: netbsd-firecracker
+          path: |
+            out/netbsd-kern.bin
+            out/netbsd-rootfs.bin.xz
+            out/firecracker
+            out/netbsd.id_rsa
+            out/netbsd.id_rsa.pub
+
+  release:
+    name: Publish release
+    needs: [build]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: netbsd-firecracker
+          path: out
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --title "${{ github.ref_name }} (NetBSD ${NETBSD_RELEASE})" \
+            --generate-notes \
+            out/netbsd-kern.bin \
+            out/netbsd-rootfs.bin.xz \
+            out/firecracker \
+            out/netbsd.id_rsa \
+            out/netbsd.id_rsa.pub
