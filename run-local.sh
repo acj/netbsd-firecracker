@@ -73,7 +73,7 @@ echo "Waiting for sshd at $GUEST_IP ..."
 for i in $(seq 1 30); do
     if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
            -o ConnectTimeout=1 -i "$OUTDIR/netbsd.id_rsa" \
-           "root@$GUEST_IP" 'uname -a && df -h / && sysctl -n hw.ncpu && which rsync'; then
+           "root@$GUEST_IP" 'uname -a && df -h / && /sbin/sysctl -n hw.ncpu && which rsync'; then
         echo "✅ smoke test passed"
         ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             -i "$OUTDIR/netbsd.id_rsa" "root@$GUEST_IP" reboot || true
