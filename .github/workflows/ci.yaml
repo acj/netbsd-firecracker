@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release tag (e.g. v0.1.0)
+        required: true
+      netbsd-release:
+        description: NetBSD release to build from
+        required: false
+        default: 11.0_RC5
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      NETBSD_RELEASE: ${{ inputs.netbsd-release }}
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+
+      - name: Build kernel (and cross toolchain)
+        run: ./build-kernel.sh
+
+      - name: Generate SSH keypair
+        run: ./generate-ssh-key.sh
+
+      - name: Build rootfs
+        run: sudo -E ./build-rootfs.sh
+
+      - name: Fetch Firecracker
+        run: ./fetch-firecracker.sh
+
+      # GitHub-hosted Linux runners expose /dev/kvm, so we can boot the image
+      # before publishing it.
+      - name: Smoke test
+        run: sudo ./run-local.sh
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ inputs.version }}" \
+            --title "${{ inputs.version }} (NetBSD ${NETBSD_RELEASE})" \
+            --generate-notes \
+            out/netbsd-kern.bin \
+            out/netbsd-rootfs.bin.xz \
+            out/firecracker \
+            out/netbsd.id_rsa \
+            out/netbsd.id_rsa.pub

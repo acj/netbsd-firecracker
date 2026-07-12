@@ -1,0 +1,40 @@
+#!/bin/sh
+#
+# Configure the guest network from the MAC address assigned by Firecracker,
+# mirroring freebsd-firecracker's fcnet-setup.sh: the last four octets of the
+# MAC are the IPv4 address (06:00:AC:10:00:02 -> 172.16.0.2), and the gateway
+# is .1 on the same /24.
+#
+# PROVIDE: fcnet
+# REQUIRE: root
+# BEFORE:  NETWORKING
+
+$_rc_subr_loaded . /etc/rc.subr
+
+name="fcnet"
+rcvar=$name
+start_cmd="${name}_start"
+stop_cmd=":"
+
+fcnet_start()
+{
+	iface="vioif0"
+	mac="$(/sbin/ifconfig "$iface" 2>/dev/null | /usr/bin/awk '/address:/ { print $2 }')"
+	if [ -z "$mac" ]; then
+		warn "fcnet: no MAC address on $iface; skipping network setup"
+		return
+	fi
+
+	oIFS="$IFS"; IFS=:
+	set -- $mac
+	IFS="$oIFS"
+
+	ip="$((0x$3)).$((0x$4)).$((0x$5)).$((0x$6))"
+	gw="$((0x$3)).$((0x$4)).$((0x$5)).1"
+
+	/sbin/ifconfig "$iface" inet "$ip/24" up
+	/sbin/route -q add default "$gw"
+}
+
+load_rc_config $name
+run_rc_command "$1"
