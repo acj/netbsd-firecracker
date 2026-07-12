@@ -108,8 +108,12 @@ mkdir -p "$ROOTDIR/usr/pkg"
 for pkg in $RSYNC_PKGS; do
     pkgfile="$WORKDIR/$pkg.tgz"
     if [ ! -f "$pkgfile" ]; then
-        # Resolve the exact versioned filename from the mirror index.
-        pkgname="$(curl -fsL "$PKGSRC_MIRROR/" | grep -o "${pkg}-[0-9][^\"]*\.tgz" | sort -V | tail -1)"
+        # Resolve the exact versioned filename from the mirror index. Anchor
+        # the match to the start of the href so e.g. "openrsync-*.tgz" doesn't
+        # shadow "rsync-*.tgz".
+        pkgname="$(curl -fsL "$PKGSRC_MIRROR/" \
+            | grep -o "href=\"${pkg}-[0-9][^\"]*\.tgz\"" \
+            | sed 's/^href="//; s/"$//' | sort -V | tail -1)"
         [ -n "$pkgname" ] || { echo "error: could not resolve $pkg on $PKGSRC_MIRROR" >&2; exit 1; }
         echo "Fetching $pkgname ..."
         curl -fL -o "$pkgfile" "$PKGSRC_MIRROR/$pkgname"
