@@ -76,8 +76,13 @@ for i in $(seq 1 30); do
            "root@$GUEST_IP" 'uname -a && df -h / && /sbin/sysctl -n hw.ncpu && which rsync'; then
         echo "✅ smoke test passed"
         ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-            -i "$OUTDIR/netbsd.id_rsa" "root@$GUEST_IP" reboot || true
-        wait "$fc_pid" || true
+            -i "$OUTDIR/netbsd.id_rsa" "root@$GUEST_IP" /sbin/reboot || true
+        # Firecracker exits when the guest reboots; give it a moment but
+        # never hang here — the EXIT trap kills any leftover process.
+        for i in $(seq 1 30); do
+            kill -0 "$fc_pid" 2>/dev/null || break
+            sleep 1
+        done
         exit 0
     fi
     sleep 1
