@@ -64,7 +64,7 @@ overrides (see `files/FIRECRACKER.conf`) rather than patching the tree.
 
 ### Rootfs
 
-Assembled from the official `base.tgz` + `etc.tgz` binary sets into an FFS image with
+Assembled from the official `base.tar.xz` + `etc.tar.xz` binary sets into an FFS image with
 `nbmakefs` (no loop mounts, no chroot). Guest-side configuration lives in `files/`:
 
 - `rc.conf` — enables `sshd`, `resize_root=YES` (grows the filesystem to match the

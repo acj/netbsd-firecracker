@@ -38,15 +38,17 @@ rm -rf "$ROOTDIR"
 mkdir -p "$ROOTDIR" "$OUTDIR"
 
 # --- Extract binary sets ------------------------------------------------------
-# base + etc are enough for a CI guest; add comp.tgz if users want cc in the VM.
+# base + etc are enough for a CI guest; add comp if users want cc in the VM.
+# Since NetBSD 10 the binary sets are published as .tar.xz (source sets and
+# pkgsrc packages are still .tgz).
 for set in base etc; do
-    tarball="$WORKDIR/$set.tgz"
+    tarball="$WORKDIR/$set.tar.xz"
     if [ ! -f "$tarball" ]; then
-        echo "Fetching $set.tgz ..."
+        echo "Fetching $set.tar.xz ..."
         curl -fL -o "$tarball" \
-            "$NETBSD_MIRROR/NetBSD-$NETBSD_RELEASE/$MACHINE/binary/sets/$set.tgz"
+            "$NETBSD_MIRROR/NetBSD-$NETBSD_RELEASE/$MACHINE/binary/sets/$set.tar.xz"
     fi
-    tar -xzpf "$tarball" -C "$ROOTDIR"
+    tar -xJpf "$tarball" -C "$ROOTDIR"
 done
 
 # --- Device nodes -------------------------------------------------------------
