@@ -11,13 +11,13 @@ on:
       netbsd-release:
         description: NetBSD release to build from
         required: false
-        default: 11.0_RC5
+        default: 11.0_RC6
 
 permissions:
   contents: write
 
 env:
-  NETBSD_RELEASE: ${{ inputs.netbsd-release || '11.0_RC5' }}
+  NETBSD_RELEASE: ${{ inputs.netbsd-release || '11.0_RC6' }}
 
 jobs:
   build:

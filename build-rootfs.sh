@@ -2,7 +2,7 @@
 
 set -eu
 
-NETBSD_RELEASE="${NETBSD_RELEASE:-11.0_RC5}"
+NETBSD_RELEASE="${NETBSD_RELEASE:-11.0_RC6}"
 NETBSD_MIRROR="${NETBSD_MIRROR:-https://cdn.netbsd.org/pub/NetBSD}"
 PKGSRC_MIRROR="${PKGSRC_MIRROR:-https://cdn.netbsd.org/pub/pkgsrc/packages/NetBSD/x86_64/11.0/All}"
 MACHINE=amd64
@@ -26,15 +26,15 @@ fi
 rm -rf "$ROOTDIR"
 mkdir -p "$ROOTDIR" "$OUTDIR"
 
-# base + etc are enough for a basic CI runner. We can add comp.tgz if a compiler is needed
+# base + etc are enough for a basic CI runner. We can add comp if a compiler is needed
 for set in base etc; do
-    tarball="$WORKDIR/$set.tgz"
+    tarball="$WORKDIR/$set.tar.xz"
     if [ ! -f "$tarball" ]; then
-        echo "Fetching $set.tgz ..."
+        echo "Fetching $set.tar.xz ..."
         curl -fL -o "$tarball" \
-            "$NETBSD_MIRROR/NetBSD-$NETBSD_RELEASE/$MACHINE/binary/sets/$set.tgz"
+            "$NETBSD_MIRROR/NetBSD-$NETBSD_RELEASE/$MACHINE/binary/sets/$set.tar.xz"
     fi
-    tar -xzpf "$tarball" -C "$ROOTDIR"
+    tar -xJpf "$tarball" -C "$ROOTDIR"
 done
 
 [ -f "$ROOTDIR/dev/MAKEDEV" ] || cp "$ROOTDIR/etc/MAKEDEV" "$ROOTDIR/dev/MAKEDEV" 2>/dev/null || true
