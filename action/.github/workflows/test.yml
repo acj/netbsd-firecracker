@@ -1,0 +1,182 @@
+name: Test
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '0 6 * * 3'
+  workflow_dispatch:
+
+jobs:
+  pre-run:
+    name: Pre-run step executes
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+      - run: if [ -f pre-run ]; then echo "pre-run should not exist yet"; exit 1; fi
+      - uses: ./
+        with:
+          pre-run: touch pre-run
+          verbose: true
+      - run: if [ ! -f pre-run ]; then echo "pre-run should exist"; exit 1; fi
+      - run: if [ "$(id -u)" = "0" ]; then echo "current user should not be root"; exit 1; fi
+
+  pre-run-non-root:
+    name: Pre-run step executes as a user other than root
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+      - uses: ./
+        with:
+          pre-run: if [ "$(id -u)" = "0" ]; then echo "current user should not be root"; exit 1; fi
+          verbose: true
+
+  run-in-vm:
+    name: Run-in-vm step executes
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+      - run: if [ -f run-in-vm ]; then echo "run-in-vm should not exist yet"; exit 1; fi
+      - uses: ./
+        with:
+          run-in-vm: uname -a > run-in-vm
+          verbose: true
+      - run: if [ ! -f run-in-vm ]; then echo "run-in-vm should exist (copied out of VM)"; exit 1; fi
+      - run: if ! grep -q "NetBSD" run-in-vm; then echo "run-in-vm should contain NetBSD"; exit 1; fi
+
+  run-in-vm-single-quote:
+    name: Run-in-vm script can contain a single quote
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+      - uses: ./
+        with:
+          run-in-vm: |
+            echo "It's running inside the VM" > single-quote
+          verbose: true
+      - run: if ! grep -q "It's running inside the VM" single-quote; then echo "single-quote should contain script output"; exit 1; fi
+
+  run-in-vm-sbin-path:
+    name: Run-in-vm script can use tools from /sbin without a full path
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+      - uses: ./
+        with:
+          run-in-vm: sysctl -n kern.ostype > ostype
+          verbose: true
+      - run: if [ "$(cat ostype)" != "NetBSD" ]; then echo "sysctl should run without a full path, got '$(cat ostype)'"; exit 1; fi
+
+  post-run:
+    name: Post-run step executes
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+      - run: if [ -f post-run ]; then echo "post-run should not exist yet"; exit 1; fi
+      - uses: ./
+        with:
+          post-run: touch post-run
+          verbose: true
+      - run: if [ ! -f post-run ]; then echo "post-run should exist"; exit 1; fi
+
+  post-run-non-root:
+    name: Post-run step executes as a user other than root
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+      - uses: ./
+        with:
+          post-run: if [ "$(id -u)" = "0" ]; then echo "current user should not be root"; exit 1; fi
+          verbose: true
+
+  vcpu-count-explicit:
+    name: Explicit vcpu-count is honored inside the VM
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+      - uses: ./
+        with:
+          vcpu-count: 1
+          run-in-vm: sysctl -n hw.ncpu > ncpu
+          verbose: true
+      - run: if [ "$(cat ncpu)" != "1" ]; then echo "VM should report 1 vCPU, got $(cat ncpu)"; exit 1; fi
+
+  vcpu-count-auto:
+    name: Auto vcpu-count matches the runner's logical core count
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+      - uses: ./
+        with:
+          vcpu-count: auto
+          run-in-vm: sysctl -n hw.ncpu > ncpu
+          verbose: true
+      - run: |
+          expected="$(nproc)"
+          actual="$(cat ncpu)"
+          if [ "$actual" != "$expected" ]; then echo "VM should report $expected vCPU(s), got $actual"; exit 1; fi
+
+  resize-disk:
+    name: Resize the rootfs filesystem to a given size
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+      - uses: ./
+        with:
+          disk-size: 4G
+          # Growing the disk makes the guest resize its root filesystem and
+          # reboot on first boot; this exercises the action's relaunch path.
+          # Writing 3.5G only fits if the resize actually happened.
+          run-in-vm: dd if=/dev/zero of=/rootfs.img bs=1m count=3500
+          verbose: true
+
+  resize-disk-df:
+    name: Resized root filesystem reports the grown size
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+      - uses: ./
+        with:
+          disk-size: 4G
+          run-in-vm: df -k / | awk 'NR==2 {print $2}' > rootkb
+          verbose: true
+      - run: if [ "$(cat rootkb)" -lt 3000000 ]; then echo "root fs should be ~4G after resize, got $(cat rootkb)KB"; exit 1; fi
+
+  default-disk-no-resize:
+    name: Default disk-size boots without a resize reboot
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+      - uses: ./
+        with:
+          run-in-vm: echo ok > no-resize
+          verbose: true
+      - run: if ! grep -q ok no-resize; then echo "VM should boot without a resize reboot"; exit 1; fi
+
+  exit-code-propagates:
+    name: Failing run-in-vm script fails the step
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+      - uses: ./
+        id: failing-script
+        continue-on-error: true
+        with:
+          run-in-vm: exit 7
+          verbose: true
+      - run: if [ "${{ steps.failing-script.outcome }}" != "failure" ]; then echo "step should fail when the VM script fails"; exit 1; fi
+
+  internet-access:
+    name: Guest has internet access through the NAT
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+      - uses: ./
+        with:
+          run-in-vm: ping -c 1 -w 5 8.8.8.8 > /dev/null && echo ok > internet
+          verbose: true
+      - run: if ! grep -q ok internet; then echo "guest should reach the internet"; exit 1; fi

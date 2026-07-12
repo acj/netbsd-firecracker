@@ -94,12 +94,21 @@ confirmed working.
 Stock upstream release. No fork, no patches. `fetch-firecracker.sh` downloads and
 verifies a pinned version.
 
+## GitHub Action
+
+The user-facing companion action (analogous to
+[freebsd-firecracker-action](https://github.com/acj/freebsd-firecracker-action))
+is sketched in [`action/`](action/), ready to be extracted into its own
+repository once a release of this repo's artifacts is published.
+
 ## Open items
 
 - [ ] Pin to NetBSD 11.0 release once it ships (currently tracking an RC)
-- [ ] First boot on GitHub Actions hardware (Intel and AMD runners)
+- [X] First boot on GitHub Actions hardware (AMD runners; Intel untested)
 - [ ] Confirm SMP brings up all vCPUs via MP tables (no ACPI in MICROVM)
-- [ ] Confirm `resize_root` grows the fs when the image is truncated larger on the host
-- [ ] Confirm `reboot` inside the guest terminates the Firecracker process
-- [ ] Verify rsync-from-pkgsrc extraction (dependency closure, PATH)
+- [X] Confirm `resize_root` grows the fs when the image is truncated larger on the host
+      (grows on first boot, then reboots; launchers must relaunch the VM once)
+- [X] Confirm `reboot` inside the guest terminates the Firecracker process
+- [X] Verify rsync-from-pkgsrc extraction (dependency closure, PATH)
 - [ ] Boot-time measurement (target: comparable to FreeBSD's ~12s, likely much faster)
+- [ ] Extract `action/` into a standalone netbsd-firecracker-action repo
