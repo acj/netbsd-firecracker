@@ -118,7 +118,9 @@ for pkg in $RSYNC_PKGS; do
         echo "Fetching $pkgname ..."
         curl -fL -o "$pkgfile" "$PKGSRC_MIRROR/$pkgname"
     fi
-    tar -xzf "$pkgfile" -C "$ROOTDIR/usr/pkg" --exclude '+*'
+    # No -z: pkgsrc packages keep the .tgz suffix but newer official builds
+    # are zstd-compressed; let GNU tar detect the compression from the file.
+    tar -xf "$pkgfile" -C "$ROOTDIR/usr/pkg" --exclude '+*'
 done
 # /usr/pkg/bin is in the default PATH, but the action invokes plain `rsync`
 # over ssh (non-interactive shell); a symlink into /usr/bin avoids PATH games.
