@@ -74,6 +74,15 @@ for i in $(seq 1 30); do
     if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
            -o ConnectTimeout=1 -i "$OUTDIR/netbsd.id_rsa" \
            "root@$GUEST_IP" 'uname -a && df -h / && /sbin/sysctl -n hw.ncpu && which rsync'; then
+        # The image was truncated to 4G above; resize_root must have grown
+        # the 2G filesystem into it.
+        rootkb=$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -i "$OUTDIR/netbsd.id_rsa" "root@$GUEST_IP" 'df -k /' \
+            | awk 'NR==2 {print $2}')
+        if [ "${rootkb:-0}" -lt 3000000 ]; then
+            echo "❌ root fs is ${rootkb:-?}KB; resize_root didn't grow it" >&2
+            exit 1
+        fi
         echo "✅ smoke test passed"
         ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             -i "$OUTDIR/netbsd.id_rsa" "root@$GUEST_IP" /sbin/reboot || true
