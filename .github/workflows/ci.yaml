@@ -11,12 +11,15 @@ on:
       netbsd-release:
         description: NetBSD release to build from
         required: false
-        default: 11.0_RC6
+      firecracker-version:
+        description: Firecracker version to build from (include the leading v)
+        required: false
 
 permissions:
   contents: write
 
 env:
+  FIRECRACKER_VERSION: ${{ inputs.firecracker-version || 'v1.16.1' }}
   NETBSD_RELEASE: ${{ inputs.netbsd-release || '11.0_RC6' }}
 
 jobs:

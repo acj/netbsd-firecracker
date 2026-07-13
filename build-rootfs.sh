@@ -2,7 +2,6 @@
 
 set -eu
 
-NETBSD_RELEASE="${NETBSD_RELEASE:-11.0_RC6}"
 NETBSD_MIRROR="${NETBSD_MIRROR:-https://cdn.netbsd.org/pub/NetBSD}"
 PKGSRC_MIRROR="${PKGSRC_MIRROR:-https://cdn.netbsd.org/pub/pkgsrc/packages/NetBSD/x86_64/11.0/All}"
 MACHINE=amd64

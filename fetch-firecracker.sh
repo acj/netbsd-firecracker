@@ -2,7 +2,6 @@
 
 set -eu
 
-FIRECRACKER_VERSION="${FIRECRACKER_VERSION:-v1.16.1}"
 ARCH=x86_64
 
 BASEDIR="$(cd "$(dirname "$0")" && pwd)"
