@@ -59,19 +59,47 @@ cat > "$WORKDIR/vmconfig.json" <<EOF
 EOF
 
 rm -f /tmp/netbsd-fc-test.socket
-"$FIRECRACKER" --no-api --config-file "$WORKDIR/vmconfig.json" &
-fc_pid=$!
+start_firecracker() {
+    "$FIRECRACKER" --no-api --config-file "$WORKDIR/vmconfig.json" &
+    fc_pid=$!
+}
+start_firecracker
 trap 'kill $fc_pid 2>/dev/null || true' EXIT
 
+# When resize_root grows the filesystem on first boot it reboots the guest, which Firecracker
+# treats as a shutdown. Allow one relaunch for that, and then treat additional exits as failures.
+relaunches=1
+
 echo "Waiting for sshd at $GUEST_IP ..."
-for i in $(seq 1 30); do
+for i in $(seq 1 60); do
+    if ! kill -0 "$fc_pid" 2>/dev/null; then
+        wait "$fc_pid" 2>/dev/null || true
+        if [ "$relaunches" -gt 0 ]; then
+            relaunches=$((relaunches - 1))
+            echo "Firecracker exited (first-boot resize reboot); relaunching ..."
+            start_firecracker
+        else
+            echo "❌ Firecracker exited unexpectedly" >&2
+            exit 1
+        fi
+    fi
     if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
            -o ConnectTimeout=1 -i "$OUTDIR/netbsd.id_rsa" \
-           "root@$GUEST_IP" 'uname -a && df -h / && sysctl -n hw.ncpu && which rsync'; then
+           "root@$GUEST_IP" 'uname -a && df -h / && /sbin/sysctl -n hw.ncpu && which rsync'; then
+        rootkb=$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -i "$OUTDIR/netbsd.id_rsa" "root@$GUEST_IP" 'df -k /' \
+            | awk 'NR==2 {print $2}')
+        if [ "${rootkb:-0}" -lt 3000000 ]; then
+            echo "❌ root fs is ${rootkb:-?}KB; resize_root didn't grow it" >&2
+            exit 1
+        fi
         echo "✅ smoke test passed"
         ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-            -i "$OUTDIR/netbsd.id_rsa" "root@$GUEST_IP" reboot || true
-        wait "$fc_pid" || true
+            -i "$OUTDIR/netbsd.id_rsa" "root@$GUEST_IP" /sbin/reboot || true
+        for i in $(seq 1 30); do
+            kill -0 "$fc_pid" 2>/dev/null || break
+            sleep 1
+        done
         exit 0
     fi
     sleep 1

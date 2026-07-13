@@ -4,7 +4,7 @@ set -eu
 
 NETBSD_MIRROR="${NETBSD_MIRROR:-https://cdn.netbsd.org/pub/NetBSD}"
 MACHINE=amd64
-KERNEL_CONFIG="${KERNEL_CONFIG:-MICROVM}"
+KERNEL_CONFIG="${KERNEL_CONFIG:-FIRECRACKER}"
 
 BASEDIR="$(cd "$(dirname "$0")" && pwd)"
 WORKDIR="$BASEDIR/work"
