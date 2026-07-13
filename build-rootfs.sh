@@ -78,7 +78,7 @@ for pkg in $RSYNC_PKGS; do
         echo "Fetching $pkgname ..."
         curl -fL -o "$pkgfile" "$PKGSRC_MIRROR/$pkgname"
     fi
-    tar -xzf "$pkgfile" -C "$ROOTDIR/usr/pkg" --exclude '+*'
+    tar -xf "$pkgfile" -C "$ROOTDIR/usr/pkg" --exclude '+*'
 done
 # Avoid PATH weirdness when invoking rsync over ssh
 ln -sf ../pkg/bin/rsync "$ROOTDIR/usr/bin/rsync"
