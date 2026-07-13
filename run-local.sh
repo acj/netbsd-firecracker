@@ -66,6 +66,52 @@ start_firecracker() {
 start_firecracker
 trap 'kill $fc_pid 2>/dev/null || true' EXIT
 
+SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -i $OUTDIR/netbsd.id_rsa"
+
+test_rsync() {
+    echo "Testing rsync in guest..."
+
+    if ! ssh $SSH_OPTS "root@$GUEST_IP" 'rsync --version' >/dev/null 2>&1; then
+        echo "❌ rsync failed to run in guest (missing shared libs?)" >&2
+        ssh $SSH_OPTS "root@$GUEST_IP" 'rsync --version' >&2 || true
+        return 1
+    fi
+
+    if ! ssh $SSH_OPTS "root@$GUEST_IP" 'sh -eu -c "
+        rm -rf /tmp/rs-src /tmp/rs-dst
+        mkdir -p /tmp/rs-src/sub
+        dd if=/dev/urandom of=/tmp/rs-src/data bs=1024 count=256 2>/dev/null
+        echo hello > /tmp/rs-src/sub/greeting
+        rsync -az --checksum /tmp/rs-src/ /tmp/rs-dst/
+        cmp /tmp/rs-src/data /tmp/rs-dst/data
+        cmp /tmp/rs-src/sub/greeting /tmp/rs-dst/sub/greeting
+    "'; then
+        echo "❌ in-guest rsync transfer failed" >&2
+        return 1
+    fi
+
+    if command -v rsync >/dev/null 2>&1; then
+        rm -rf "$WORKDIR/rs-src" "$WORKDIR/rs-back"
+        mkdir -p "$WORKDIR/rs-src/sub"
+        dd if=/dev/urandom of="$WORKDIR/rs-src/data" bs=1024 count=256 2>/dev/null
+        echo "hello over ssh" > "$WORKDIR/rs-src/sub/greeting"
+        if ! rsync -az -e "ssh $SSH_OPTS" "$WORKDIR/rs-src/" "root@$GUEST_IP:/tmp/rs-rt/"; then
+            echo "❌ rsync host->guest failed" >&2; return 1
+        fi
+        if ! rsync -az -e "ssh $SSH_OPTS" "root@$GUEST_IP:/tmp/rs-rt/" "$WORKDIR/rs-back/"; then
+            echo "❌ rsync guest->host failed" >&2; return 1
+        fi
+        if ! diff -r "$WORKDIR/rs-src" "$WORKDIR/rs-back"; then
+            echo "❌ rsync round-trip data mismatch" >&2; return 1
+        fi
+        echo "   host<->guest rsync round-trip OK"
+    else
+        echo "   (host has no rsync; skipped over-ssh round-trip test)"
+    fi
+
+    echo "✅ rsync test passed"
+}
+
 # When resize_root grows the filesystem on first boot it reboots the guest, which Firecracker
 # treats as a shutdown. Allow one relaunch for that, and then treat additional exits as failures.
 relaunches=1
@@ -94,6 +140,7 @@ for i in $(seq 1 60); do
             exit 1
         fi
         echo "✅ smoke test passed"
+        test_rsync || exit 1
         ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             -i "$OUTDIR/netbsd.id_rsa" "root@$GUEST_IP" /sbin/reboot || true
         for i in $(seq 1 30); do
