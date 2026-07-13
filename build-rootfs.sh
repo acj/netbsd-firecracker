@@ -70,7 +70,10 @@ mkdir -p "$ROOTDIR/usr/pkg"
 for pkg in $RSYNC_PKGS; do
     pkgfile="$WORKDIR/$pkg.tgz"
     if [ ! -f "$pkgfile" ]; then
-        pkgname="$(curl -fsL "$PKGSRC_MIRROR/" | grep -o "${pkg}-[0-9][^\"]*\.tgz" | sort -V | tail -1)"
+        pkgname="$(curl -fsL "$PKGSRC_MIRROR/" \
+            | grep -oE "href=\"${pkg}-[0-9][^\"]*\.tgz\"" \
+            | sed -e 's/^href="//' -e 's/"$//' \
+            | sort -V | tail -1)"
         [ -n "$pkgname" ] || { echo "error: could not resolve $pkg on $PKGSRC_MIRROR" >&2; exit 1; }
         echo "Fetching $pkgname ..."
         curl -fL -o "$pkgfile" "$PKGSRC_MIRROR/$pkgname"
