@@ -75,6 +75,7 @@ jobs:
           gh release create "${{ github.ref_name }}" \
             --title "${{ github.ref_name }} (NetBSD ${NETBSD_RELEASE})" \
             --generate-notes \
+            --draft \
             out/netbsd-kern.bin \
             out/netbsd-rootfs.bin.xz \
             out/firecracker \
