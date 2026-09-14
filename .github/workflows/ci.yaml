@@ -21,7 +21,7 @@ permissions:
   contents: write
 
 env:
-  FIRECRACKER_VERSION: ${{ inputs.firecracker-version || 'v1.17.0' }}
+  FIRECRACKER_VERSION: ${{ inputs.firecracker-version || 'v1.16.1' }}
   NETBSD_RELEASE: ${{ inputs.netbsd-release || '11.0' }}
 
 jobs:
